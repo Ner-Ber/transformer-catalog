@@ -24,3 +24,7 @@ Default `--data-dir` resolves to `../eq_mag_prediction/results/catalogs/ingested
 ## Notebook
 
 Open `scripts/train_and_visualize.ipynb`.
+
+## Repository
+
+Remote: https://github.com/Ner-Ber/transformer-catalog
