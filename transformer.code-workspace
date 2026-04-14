@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../eq_mag_prediction"
+		}
+	],
+	"settings": {}
+}

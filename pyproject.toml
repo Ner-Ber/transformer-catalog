@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "catalog-tfm"
+version = "0.1.0"
+description = "Shallow transformer for earthquake catalog continuation experiments"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+catalog-tfm-train = "catalog_tfm.train:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["catalog_tfm*"]
