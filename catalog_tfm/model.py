@@ -1,4 +1,4 @@
-"""Small Keras transformer encoder for sequence regression."""
+"""Small Keras transformer encoder for sequence regression (magnitude + Δt)."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ def build_model(
     num_layers: int = 2,
     dropout: float = 0.1,
 ) -> keras.Model:
-    """Next-magnitude regression: single linear output."""
+    """Predict next-event magnitude and inter-event time (2 outputs)."""
     if d_model % num_heads != 0:
         raise ValueError(f"d_model ({d_model}) must be divisible by num_heads ({num_heads})")
     key_dim = d_model // num_heads
@@ -33,5 +33,5 @@ def build_model(
         ffn = layers.Dropout(dropout)(ffn)
         x = layers.LayerNormalization(epsilon=1e-6)(x + ffn)
     x = layers.GlobalAveragePooling1D()(x)
-    outputs = layers.Dense(1)(x)
+    outputs = layers.Dense(2)(x)
     return keras.Model(inputs, outputs)
