@@ -1,0 +1,19 @@
+# Custom Repos
+-e git+ssh://git@github.com/Ner-Ber/transformer-catalog.git@0e94a478c714a4fffa81623fa4ad53a1d52fa762#egg=catalog_tfm
+-e git+https://github.com/Ner-Ber/eq_mag_prediction@65eceff081bacd8897cb51e89fc8a76336cb9360#egg=eq_mag_prediction
+
+# Core ML & Math
+tensorflow==2.21.0
+tensorflow-probability==0.25.0
+scikit-learn==1.8.0
+xarray==2026.4.0
+
+# Geospatial & Plotting
+geopandas==1.1.3
+folium==0.20.0
+matplotlib==3.10.9
+
+# Environment / Tools
+ipykernel==7.2.0
+tqdm==4.67.3
+rich==15.0.0
