@@ -2,24 +2,26 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple
+import dataclasses
+import os
+import pathlib
+import typing
 
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
-
-from eq_mag_prediction.utilities import catalog_processing
-from eq_mag_prediction.utilities import loading_utils
+import sklearn.preprocessing
+import tensorflow as tf
 
 import catalog_tfm.discretize
+import eq_mag_prediction.utilities.catalog_processing
+import eq_mag_prediction.utilities.loading_utils
+import eq_mag_prediction.utilities.ml_utils
 
 REQUIRED_COLUMNS = ("time", "magnitude")
 OPTIONAL_NUMERIC = ("latitude", "longitude", "depth")
 
 
-@dataclass
+@dataclasses.dataclass
 class CatalogTrainValTest:
   """Train / val / test tensors and metadata for evaluation."""
 
@@ -29,17 +31,23 @@ class CatalogTrainValTest:
   y_val: np.ndarray
   X_test: np.ndarray
   y_test: np.ndarray
-  file_hashes: Dict[str, str]
+  file_hashes: typing.Dict[str, str]
   magnitude_bin_edges: np.ndarray
   dt_bin_seconds: float
 
 
-def default_ingested_dir() -> Path:
+def default_ingested_dir() -> pathlib.Path:
   """Sibling ``eq_mag_prediction`` ingested path relative to cwd."""
-  return (Path.cwd().resolve().parent / "eq_mag_prediction" / "results" / "catalogs" / "ingested")
+  return (
+      pathlib.Path.cwd().resolve().parent
+      / "eq_mag_prediction"
+      / "results"
+      / "catalogs"
+      / "ingested"
+  )
 
 
-def resolve_data_dir(path: str | Path | None) -> Path:
+def resolve_data_dir(path: str | pathlib.Path | None) -> pathlib.Path:
   """Return absolute :class:`Path`.
 
   If *path* is relative and starts with ``results/``, resolve via
@@ -48,17 +56,17 @@ def resolve_data_dir(path: str | Path | None) -> Path:
   """
   if path is None:
     return default_ingested_dir()
-  p = Path(path)
+  p = pathlib.Path(path)
   if p.is_absolute():
     return p
   s = str(p).replace("\\", "/").lstrip("/")
   if s.startswith("results/"):
-    return Path(loading_utils.get_resource_path(s))
-  return (Path.cwd() / p).resolve()
+    return pathlib.Path(eq_mag_prediction.utilities.loading_utils.get_resource_path(s))
+  return (pathlib.Path.cwd() / p).resolve()
 
 
-def list_catalog_csvs(data_dir: Path) -> List[Path]:
-  data_dir = Path(data_dir)
+def list_catalog_csvs(data_dir: pathlib.Path) -> typing.List[pathlib.Path]:
+  data_dir = pathlib.Path(data_dir)
   if not data_dir.is_dir():
     raise FileNotFoundError(f"Data directory does not exist: {data_dir}")
   paths = sorted(data_dir.glob("*.csv"))
@@ -67,7 +75,7 @@ def list_catalog_csvs(data_dir: Path) -> List[Path]:
   return paths
 
 
-def _filename_matches_any(name: str, substrings: Sequence[str]) -> bool:
+def _filename_matches_any(name: str, substrings: typing.Sequence[str]) -> bool:
   """True if *name* contains any *substrings* (case-insensitive)."""
   lower = name.lower()
   return any(s.lower() in lower for s in substrings)
@@ -93,7 +101,7 @@ def _prepare_frame(df: pd.DataFrame) -> pd.DataFrame:
   return out
 
 
-def windows_from_prepared(df: pd.DataFrame, seq_len: int) -> Tuple[np.ndarray, np.ndarray]:
+def windows_from_prepared(df: pd.DataFrame, seq_len: int) -> typing.Tuple[np.ndarray, np.ndarray]:
   """Build ``X`` and ``y`` with ``y[:,0]`` = next magnitude, ``y[:,1]`` = Δt (s) to that event."""
   n = len(df)
   if n < seq_len + 1:
@@ -125,7 +133,7 @@ def _split_three_chronological(
     train_frac: float,
     val_frac: float,
     test_frac: float,
-) -> Tuple[slice, slice, slice]:
+) -> typing.Tuple[slice, slice, slice]:
   if n < 3:
     raise ValueError(
         f"Need at least 3 windows for train/val/test split (got n={n})"
@@ -149,18 +157,18 @@ def _split_three_chronological(
 
 
 def load_catalog_train_val_test(
-    data_dir: Path,
+    data_dir: pathlib.Path,
     seq_len: int,
     *,
     train_fraction: float = 0.7,
     val_fraction: float = 0.15,
     test_fraction: float = 0.15,
-    magnitude_bin_edges: Optional[np.ndarray] = None,
+    magnitude_bin_edges: typing.Optional[np.ndarray] = None,
     dt_bin_seconds: float = 1200.0,
-    max_rows_per_file: Optional[int] = None,
-    max_windows_per_catalog: Optional[int] = None,
-    exclude_filename_contains: Optional[Sequence[str]] = None,
-    test_only_filename_keywords: Optional[Sequence[str]] = None,
+    max_rows_per_file: typing.Optional[int] = None,
+    max_windows_per_catalog: typing.Optional[int] = None,
+    exclude_filename_contains: typing.Optional[typing.Sequence[str]] = None,
+    test_only_filename_keywords: typing.Optional[typing.Sequence[str]] = None,
 ) -> CatalogTrainValTest:
   """Load CSVs, build windows per catalog, split chronologically per catalog.
 
@@ -192,8 +200,8 @@ def load_catalog_train_val_test(
       )
 
   test_kw = tuple(s for s in (test_only_filename_keywords or ()) if s)
-  paths_main: List[Path] = []
-  paths_test_only: List[Path] = []
+  paths_main: typing.List[pathlib.Path] = []
+  paths_test_only: typing.List[pathlib.Path] = []
   for p in paths:
     if test_kw and _filename_matches_any(p.name, test_kw):
       paths_test_only.append(p)
@@ -206,13 +214,13 @@ def load_catalog_train_val_test(
         "need at least one catalog not matching test_only_filename_keywords."
     )
 
-  xs_train: List[np.ndarray] = []
-  ys_train: List[np.ndarray] = []
-  xs_val: List[np.ndarray] = []
-  ys_val: List[np.ndarray] = []
-  xs_test: List[np.ndarray] = []
-  ys_test: List[np.ndarray] = []
-  file_hashes: Dict[str, str] = {}
+  xs_train: typing.List[np.ndarray] = []
+  ys_train: typing.List[np.ndarray] = []
+  xs_val: typing.List[np.ndarray] = []
+  ys_val: typing.List[np.ndarray] = []
+  xs_test: typing.List[np.ndarray] = []
+  ys_test: typing.List[np.ndarray] = []
+  file_hashes: typing.Dict[str, str] = {}
 
   for path in paths_main:
     raw = (
@@ -223,7 +231,9 @@ def load_catalog_train_val_test(
     if len(raw) == 0:
       raise ValueError(f"Empty catalog: {path}")
     prepared = _prepare_frame(raw)
-    file_hashes[path.name] = catalog_processing.hash_pandas_object(prepared)
+    file_hashes[path.name] = eq_mag_prediction.utilities.catalog_processing.hash_pandas_object(
+        prepared
+    )
     wx, wy = windows_from_prepared(prepared, seq_len)
     if max_windows_per_catalog is not None:
       wx = wx[:max_windows_per_catalog]
@@ -248,7 +258,9 @@ def load_catalog_train_val_test(
     if len(raw) == 0:
       raise ValueError(f"Empty catalog: {path}")
     prepared = _prepare_frame(raw)
-    file_hashes[path.name] = catalog_processing.hash_pandas_object(prepared)
+    file_hashes[path.name] = eq_mag_prediction.utilities.catalog_processing.hash_pandas_object(
+        prepared
+    )
     wx, wy = windows_from_prepared(prepared, seq_len)
     if max_windows_per_catalog is not None:
       wx = wx[:max_windows_per_catalog]
@@ -276,20 +288,20 @@ def load_catalog_train_val_test(
   )
 
 
-def fit_scaler(X_train: np.ndarray) -> StandardScaler:
-  scaler = StandardScaler()
+def fit_scaler(X_train: np.ndarray) -> sklearn.preprocessing.StandardScaler:
+  scaler = sklearn.preprocessing.StandardScaler()
   scaler.fit(X_train.reshape(-1, X_train.shape[-1]))
   return scaler
 
 
-def transform_X(X: np.ndarray, scaler: StandardScaler) -> np.ndarray:
+def transform_X(X: np.ndarray, scaler: sklearn.preprocessing.StandardScaler) -> np.ndarray:
   shape = X.shape
   flat = X.reshape(-1, shape[-1])
   out = scaler.transform(flat)
   return out.reshape(shape)
 
 
-def fit_y_scaler(y_train: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def fit_y_scaler(y_train: np.ndarray) -> typing.Tuple[np.ndarray, np.ndarray]:
   """Per-dimension mean and std for ``y`` (shape ``(n, 2)``)."""
   mean = y_train.mean(axis=0)
   std = y_train.std(axis=0)
@@ -303,3 +315,102 @@ def normalize_y(y: np.ndarray, mean: np.ndarray, std: np.ndarray) -> np.ndarray:
 
 def denormalize_y(y_n: np.ndarray, mean: np.ndarray, std: np.ndarray) -> np.ndarray:
   return y_n * std + mean
+
+
+def create_tf_dataset(
+    csv_file,
+    seq_length=100,
+    batch_size=32,
+    max_sequences=None,
+    shuffle_buffer=10000,
+    train_fraction=0.8,
+):
+  """Train/test sliding-window data. The scaler is fit on training pairs only."""
+  if not os.path.exists(csv_file):
+    return None
+
+  df = pd.read_csv(csv_file)
+  df = df.sort_values(by="time").reset_index(drop=True)
+  n_ev = len(df)
+  if n_ev < seq_length + 3:
+    return None
+
+  time = df["time"].values.astype(np.float64)
+  magnitude = df["magnitude"].values.astype(np.float64)
+  n_pair = n_ev - 1
+  dt = np.diff(time)
+  mag = magnitude[1:]
+  raw = np.stack([dt, mag], axis=-1)
+
+  n_train_ev = max(2, min(int(np.floor(train_fraction * n_ev)), n_ev - 1))
+  n_train_pair = n_train_ev - 1
+  if n_train_pair < seq_length + 1:
+    return None
+
+  scaler = eq_mag_prediction.utilities.ml_utils.StandardScaler(feature_axes=0)
+  scaler.fit(raw[:n_train_pair])
+  data = np.asarray(scaler.transform(raw), dtype=np.float32)
+
+  i_train_max = n_train_pair - seq_length
+  i_test0 = n_train_pair - seq_length + 1
+  if i_test0 < n_pair - seq_length and i_test0 >= 0:
+    test_window_starts = np.arange(
+        i_test0, n_pair - seq_length, dtype=np.int32
+    )
+  else:
+    test_window_starts = np.array([], dtype=np.int32)
+
+  def build_xy(indices):
+    X, y = [], []
+    for i in indices:
+      i = int(i)
+      X.append(data[i: i + seq_length])
+      y.append(data[i + 1: i + seq_length + 1])
+    if not X:
+      return None, None
+    return (np.array(X, dtype=np.float32), np.array(y, dtype=np.float32))
+
+  train_indices = list(range(0, i_train_max + 1))
+  if max_sequences is not None:
+    train_indices = train_indices[: max_sequences]
+  Xtr, ytr = build_xy(train_indices)
+  if Xtr is None:
+    return None
+
+  test_is = [int(t) for t in test_window_starts]
+  if max_sequences is not None:
+    cap = max(64, max_sequences // 4)
+    test_is = test_is[: min(len(test_is), cap)]
+  Xte, yte = build_xy(test_is) if test_is else (None, None)
+
+  buf = min(shuffle_buffer, len(Xtr)) if len(Xtr) > 0 else 1
+  train_dataset = (
+      tf.data.Dataset.from_tensor_slices((Xtr, ytr))
+      .shuffle(buf)
+      .batch(batch_size)
+      .prefetch(tf.data.AUTOTUNE)
+  )
+  if Xte is not None and len(Xte) > 0:
+    bsz = min(int(batch_size), int(len(Xte)))
+    bsz = max(1, bsz)
+    test_dataset = (
+        tf.data.Dataset.from_tensor_slices((Xte, yte))
+        .batch(bsz)
+        .prefetch(tf.data.AUTOTUNE)
+    )
+  else:
+    test_dataset = None
+    test_is = []
+
+  return {
+      "train_dataset": train_dataset,
+      "test_dataset": test_dataset,
+      "scaler": scaler,
+      "df": df,
+      "n_train_events": n_train_ev,
+      "time": time,
+      "test_window_starts": np.array(test_is, dtype=np.int32)
+      if test_is
+      else np.array([], dtype=np.int32),
+      "num_train_sequences": int(len(Xtr)),
+  }

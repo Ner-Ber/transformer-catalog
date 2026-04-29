@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Optional, Tuple
+import typing
 
 import numpy as np
+import pandas
 
 
 def default_magnitude_bin_edges() -> np.ndarray:
@@ -31,7 +32,7 @@ def dt_seconds_to_bin(
     dt_seconds: np.ndarray,
     bin_width_seconds: float,
     *,
-    max_bin_index: Optional[int] = None,
+    max_bin_index: typing.Optional[int] = None,
 ) -> np.ndarray:
   """Map ``dt >= 0`` to bin index ``floor(dt / bin_width)``, optionally clipped."""
   if bin_width_seconds <= 0:
@@ -44,7 +45,11 @@ def dt_seconds_to_bin(
   return idx
 
 
-def discretize_catalog(catalog: pd.DataFrame, magnitude_bin_edges: np.ndarray, dt_bin_seconds: float) -> pd.DataFrame:
+def discretize_catalog(
+    catalog: pandas.DataFrame,
+    magnitude_bin_edges: np.ndarray,
+    dt_bin_seconds: float,
+) -> pandas.DataFrame:
   """Return a copy of the catalog with magnitude and dt bins."""
   return catalog.copy().assign({
       "magnitude_bin": magnitude_to_bin(catalog["magnitude"], magnitude_bin_edges),

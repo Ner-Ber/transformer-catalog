@@ -10,7 +10,7 @@ import tensorflow as tf
 
 import catalog_tfm.data
 import catalog_tfm.metrics
-import catalog_tfm.model
+import catalog_tfm.model_discrete
 
 
 def main() -> None:
@@ -97,7 +97,7 @@ def main() -> None:
   X_test_t = catalog_tfm.data.transform_X(bundle.X_test, scaler_x)
 
   tf.random.set_seed(args.seed)
-  model = catalog_tfm.model.build_model(
+  model = catalog_tfm.model_discrete.build_model(
     args.seq_len,
     int(bundle.X_train.shape[-1]),
     d_model=args.d_model,
