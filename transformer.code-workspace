@@ -7,5 +7,8 @@
 			"path": "../eq_mag_prediction"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"editor.tabSize": 2,
+		"editor.insertSpaces": true
+	}
 }
